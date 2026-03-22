@@ -18,7 +18,7 @@
 3. **跨域生成:** `measured_data_simulate` —— 基于生成模型的数据扩增。
 4. **决策融合:** `fusion_v1.ipynb` —— 多源数据集成验证。
 
-### 🛠 技术栈
+### 技术栈
 - **框架:** PyTorch, NumPy, Matplotlib.
 - **算法:** $\beta$-VAE, CNN, Attention Mechanism, Feature Fusion.
 - **工具:** Git 版本管理, 模块化 Python 开发。
