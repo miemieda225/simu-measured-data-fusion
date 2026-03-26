@@ -5,11 +5,32 @@ import torch.nn.functional as F
 
 import torch
 
-def custom_loss(image, original_image, target_pos=(10, 10)):
-    y, x = target_pos
-    diff = torch.abs(image[:, 0, y, x] - original_image[:, 0, y, x])
-    return diff.mean()
+# def custom_loss(image, original_image, target_pos=(10, 10)):
+#     y, x = target_pos
+#     diff = torch.abs(image[:, 0, y, x] - original_image[:, 0, y, x])
+#     return diff.mean()
+import torch
+import torch.nn.functional as F
 
+def physics_loss(recon_image):
+    # --- 2. 拉普拉斯物理约束 (确保全场符合扩散/平滑规律) ---
+    # 定义拉普拉斯核
+    kernel = torch.tensor([[0, 1, 0], 
+                            [1, -4, 1], 
+                            [0, 1, 0]], dtype=torch.float32).to(recon_image.device).view(1, 1, 3, 3)
+    # 计算二阶导数 (Laplacian)
+    laplacian = F.conv2d(recon_image, kernel, padding=1)
+    
+    # 生成 Mask：屏蔽加载点（因为那里导数不为0），约束非加载点
+    # 简单的做法：把加载点周围 3x3 区域的权重设为 0，其余为 1
+    mask = torch.ones_like(laplacian)
+    x=21
+    y=21
+    mask[:, :, y-1:y+2, x-1:x+2] = 0 
+    
+    # 非加载点的平滑损失
+    smooth_physics_loss = torch.mean((laplacian * mask)**2)
+    return smooth_physics_loss
 
 
 def vae_loss(x_recon, x, mu, logvar, beta, L3, gamma):
@@ -26,7 +47,7 @@ def vae_loss(x_recon, x, mu, logvar, beta, L3, gamma):
     kl_loss = kl_loss_sum / B
     
     if L3:
-        Loss3 = custom_loss(x_recon, x)
+        Loss3 = physics_loss(x_recon)
     #else:
     #    Loss3 = recon_loss.new_tensor(0.0)
     total_loss = recon_loss + beta * kl_loss + gamma * Loss3
@@ -61,7 +82,7 @@ def train_vae_41(model, train_loader, val_loader, optimizer, num_epochs, device,
             recon_data, mu, logvar = model(data)
             
             # 计算损失
-            current_beta = min((epoch / 300)*beta, beta) * beta if beta_decay else beta
+            current_beta = min((epoch / num_epochs)*beta, beta) * beta if beta_decay else beta
             loss, recon_l, kl_l, l3_l = vae_loss(recon_data, data, mu, logvar, current_beta, L3, gamma)
             
             
